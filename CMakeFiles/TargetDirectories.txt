@@ -1,0 +1,3 @@
+/home/mrhause/vsc_workspace/StartProject/CMakeFiles/rebuild_cache.dir
+/home/mrhause/vsc_workspace/StartProject/CMakeFiles/StartProject.dir
+/home/mrhause/vsc_workspace/StartProject/CMakeFiles/edit_cache.dir
