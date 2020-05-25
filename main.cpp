@@ -52,6 +52,8 @@ int main(){
     Point pt = Point(200,500); //init point
     Point circle_pt = Point(200,500); //point for clearing position
     Point pt2 = Point(200,490); //init point for clearing rectangle
+    Point trajectory_pt = Point(200,500+car.rows/2);
+    Point ref_pt = Point(200-2,500+car.rows/2);
     int thickness =-1,lineType=8, shift=0;
     float distance = car.rows/2;
     int x_trans,y_trans;
@@ -112,21 +114,31 @@ int main(){
 
 //***********************************CALCUTE TRAJECTORY POINT**********************************
 
-        //circle(image, pt, 6, Scalar(0,102,204), FILLED, LINE_8); // print trajectory
+        
 //*************************************************************************************************
 //************************************calculate new positions*************************************
-        
+        //temp_orient = v_rot[i]*M_PI/180;
+        //trajectory_pt.x = ((trajectory_pt.x - pt.x) * sin(temp_orient)) - ((trajectory_pt.y - pt.y) * cos(temp_orient)) + pt.x;
+        //trajectory_pt.y = ((trajectory_pt.x - pt.x) * sin(temp_orient)) + ((trajectory_pt.y - pt.y) * cos(temp_orient)) + pt.y;
+
         orient = orient + v_rot[i];
         temp_orient = orient * M_PI / 180; //radians
+        trajectory_pt.x = distance*sin(temp_orient) + pt.x;
+        trajectory_pt.y = distance*cos(temp_orient) + pt.y;
+        circle(image, trajectory_pt, 32, Scalar(0,102,204), FILLED, LINE_8); // print trajectory
+
         pt.x = (int)(pt.x + v_lin[i] * cos(temp_orient));
         pt.y = (int)(pt.y - v_lin[i] * sin(temp_orient));
         car = rotate(car_ref,orient, &x_trans, &y_trans);
+        //trajectory
+
         //std::cout<<"x :"<<x_trans<<"y :"<<y_trans<<std::endl;
         
 //**************************************************************************************************
 //************************************PRINT NEW POSITION*******************************************
         car.copyTo(image(Rect(pt.x-x_trans,pt.y-y_trans,car.cols,car.rows)));
-        circle(image, pt, 6, Scalar(0,0,0), FILLED, LINE_8);
+        //circle(image, pt, 6, Scalar(0,0,0), FILLED, LINE_8);
+        
         imshow("Start project with opencv", image);
         waitKey(10); //delay 10ms
     } //end simulation
