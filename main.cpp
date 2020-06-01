@@ -8,6 +8,7 @@ using namespace cv;
 int v_lin[700],v_rot[700],orient=0;
 double temp_orient;
 
+//rotate object of the car based on rot angle of the car
 Mat rotate(Mat src, double angle, int *x_pos, int *y_pos)
 {
     Mat dst;
@@ -24,51 +25,12 @@ Mat rotate(Mat src, double angle, int *x_pos, int *y_pos)
     return dst;
 }
 
-int main(){
-    Mat image(1000,1000, CV_8UC3, Scalar(255,255,255));
-    Mat dst(1000,1000, CV_8UC3, Scalar(255,255,255));
-    Mat par= Mat(2, 3, CV_64FC1);;
-
-//*************************generate speeds****************************    
-    for(int i=0;i<700;i++){
-        v_lin[i]=5;
-    }
-    for(int i=0;i<200;i++){
-        v_rot[i] = 0;
-    }
-    for(int i=200;i<400;i++){
-        v_rot[i] = 1;
-    }
-        for(int i=400;i<700;i++){
-        v_rot[i] = -1;
-    }
-//**********************Load CAR IMAGE************************************
-    static Mat car;
-    //const Mat car_ref;
-    Mat trajectory;
-    car = imread("auto.png",1);
-    const Mat car_ref = car; 
-//***********************************************************************
-    Point pt = Point(200,500); //init point
-    Point circle_pt = Point(200,500); //point for clearing position
-    Point pt2 = Point(200,490); //init point for clearing rectangle
-    Point trajectory_pt = Point(200,500+car.rows/2);
-    Point ref_pt = Point(200-2,500+car.rows/2);
-    int thickness =-1,lineType=8, shift=0;
-    float distance = car.rows/2;
-    int x_trans,y_trans;
-    for(int i=0;i<700;i++){
-//************************************Clear PREVIOUS POSITIONS************************************
-        circle_pt.x = pt.x-x_trans;
-        circle_pt.y = pt.y-y_trans;
-        pt2.x = circle_pt.x+car.cols;
-        pt2.y = circle_pt.y+car.rows;
-        //car = car_ref;
-        //car = Scalar(255,255,255);
-        //car.copyTo(image(Rect(pt.x-x_trans,pt.y-y_trans,car.cols,car.rows)));
-        rectangle(image, circle_pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
-//**********************window translation**************************************
-        if(pt.y<120){
+//function to translate window when car is close to edge
+Mat translate_window(Mat image, Point &pt, Mat car){
+        Mat dst;
+        Mat par= Mat(2, 3, CV_64FC1);
+        dst = image;
+            if(pt.y<120){
             par.at<double>(0,0)=  1;  //p1
             par.at<double>(1,0)=  0;  //p2;
             par.at<double>(0,1)=  0; //p3;
@@ -109,18 +71,57 @@ int main(){
             image = dst;
             pt.x = pt.x-10;
         }
+        return image;
+}
+
+int main(){
+    Mat image(1000,1000, CV_8UC3, Scalar(255,255,255));
+    Mat dst(1000,1000, CV_8UC3, Scalar(255,255,255));
+    
+
+//*************************generate speeds****************************    
+    for(int i=0;i<700;i++){
+        v_lin[i]=5;
+    }
+    for(int i=0;i<200;i++){
+        v_rot[i] = 0;
+    }
+    for(int i=200;i<400;i++){
+        v_rot[i] = 1;
+    }
+        for(int i=400;i<700;i++){
+        v_rot[i] = -1;
+    }
+//**********************Load CAR IMAGE************************************
+    static Mat car;
+    //const Mat car_ref;
+    Mat trajectory;
+    car = imread("auto.png",1);
+    const Mat car_ref = car; 
+//***********************************************************************
+    Point pt = Point(200,500); //init point
+    Point circle_pt = Point(200,500); //point for clearing position
+    Point pt2 = Point(200,490); //init point for clearing rectangle
+    Point trajectory_pt = Point(200,500+car.rows/2);
+    Point ref_pt = Point(200-2,500+car.rows/2);
+    int thickness =-1,lineType=8, shift=0;
+    float distance = car.rows/2;
+    int x_trans,y_trans;
+
+
+    for(int i=0;i<700;i++){
+//************************************Clear PREVIOUS POSITIONS************************************
+        circle_pt.x = pt.x-x_trans;
+        circle_pt.y = pt.y-y_trans;
+        pt2.x = circle_pt.x+car.cols;
+        pt2.y = circle_pt.y+car.rows;
+        rectangle(image, circle_pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
+//**********************window translation**************************************
+       image = translate_window(image, pt, car);
 //*************************************************************************************************
 
 
-//***********************************CALCUTE TRAJECTORY POINT**********************************
-
-        
-//*************************************************************************************************
 //************************************calculate new positions*************************************
-        //temp_orient = v_rot[i]*M_PI/180;
-        //trajectory_pt.x = ((trajectory_pt.x - pt.x) * sin(temp_orient)) - ((trajectory_pt.y - pt.y) * cos(temp_orient)) + pt.x;
-        //trajectory_pt.y = ((trajectory_pt.x - pt.x) * sin(temp_orient)) + ((trajectory_pt.y - pt.y) * cos(temp_orient)) + pt.y;
-
         orient = orient + v_rot[i];
         temp_orient = orient * M_PI / 180; //radians
         trajectory_pt.x = distance*sin(temp_orient) + pt.x;
@@ -130,9 +131,6 @@ int main(){
         pt.x = (int)(pt.x + v_lin[i] * cos(temp_orient));
         pt.y = (int)(pt.y - v_lin[i] * sin(temp_orient));
         car = rotate(car_ref,orient, &x_trans, &y_trans);
-        //trajectory
-
-        //std::cout<<"x :"<<x_trans<<"y :"<<y_trans<<std::endl;
         
 //**************************************************************************************************
 //************************************PRINT NEW POSITION*******************************************
