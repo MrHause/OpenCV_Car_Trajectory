@@ -17,4 +17,8 @@ unistd.h
 -
 math.h
 -
+string
+-
+fstream
+-
 

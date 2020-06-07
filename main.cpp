@@ -3,10 +3,14 @@
 #include<stdio.h>
 #include<unistd.h>
 #include<math.h>
+#include<string>
+#include<fstream>
 using namespace cv;
 
 int v_lin[700],v_rot[700],orient=0;
 double temp_orient;
+
+Point pt = Point(200,500); //init point
 
 //rotate object of the car based on rot angle of the car
 Mat rotate(Mat src, double angle, int *x_pos, int *y_pos)
@@ -26,8 +30,9 @@ Mat rotate(Mat src, double angle, int *x_pos, int *y_pos)
 }
 
 //function to translate window when car is close to edge
-Mat translate_window(Mat image, Point &pt, Mat car){
+Mat translate_window(Mat image, Point &pt, Mat car, float &pos_x, float &pos_y){
         Mat dst;
+        static int x_right,y_top,x_lef,y_down;
         Mat par= Mat(2, 3, CV_64FC1);
         dst = image;
             if(pt.y<120){
@@ -39,7 +44,8 @@ Mat translate_window(Mat image, Point &pt, Mat car){
             par.at<double>(1,2)=  10;   //p6;
             warpAffine(image,dst,par, image.size(),INTER_LINEAR, BORDER_CONSTANT, Scalar(255,255,255));
             image = dst;
-            pt.y = pt.y+10;          
+            pt.y = pt.y+10;
+            pos_y = pos_y+10;          
         }else if(pt.y>(1000-car.rows-20)){
             par.at<double>(0,0)=  1;  //p1
             par.at<double>(1,0)=  0;  //p2;
@@ -49,7 +55,8 @@ Mat translate_window(Mat image, Point &pt, Mat car){
             par.at<double>(1,2)=  -10;   //p6;
             warpAffine(image,dst,par, image.size(),INTER_LINEAR, BORDER_CONSTANT, Scalar(255,255,255));
             image = dst;
-            pt.y = pt.y-10;        
+            pt.y = pt.y-10;
+            pos_y = pos_y-10;        
         }else if(pt.x<50){
             par.at<double>(0,0)=  1;  //p1
             par.at<double>(1,0)=  0;  //p2;
@@ -60,6 +67,7 @@ Mat translate_window(Mat image, Point &pt, Mat car){
             warpAffine(image,dst,par, image.size(),INTER_LINEAR, BORDER_CONSTANT, Scalar(255,255,255));
             image = dst;
             pt.x = pt.x+10; 
+            pos_x = pos_x+10;
         }else if(pt.x>(1000-car.cols-50)){
             par.at<double>(0,0)=  1;  //p1
             par.at<double>(1,0)=  0;  //p2;
@@ -70,14 +78,27 @@ Mat translate_window(Mat image, Point &pt, Mat car){
             warpAffine(image,dst,par, image.size(),INTER_LINEAR, BORDER_CONSTANT, Scalar(255,255,255));
             image = dst;
             pt.x = pt.x-10;
+            pos_x = pos_x-10;
         }
         return image;
+}
+
+int show_position(float pos_x, float pos_y, float roll){
+    pt.x = pos_x;
+    pt.y = pos_y;
+
+    return -1;
 }
 
 int main(){
     Mat image(1000,1000, CV_8UC3, Scalar(255,255,255));
     Mat dst(1000,1000, CV_8UC3, Scalar(255,255,255));
-    
+
+//*****************************read data******************
+    std::ifstream read_file("randomFullModelData.csv");
+    if(!read_file.is_open()) std::cout<<"erro file";
+    std::string read_x,read_y,read_roll,read_temp;
+    int count=0;
 
 //*************************generate speeds****************************    
     for(int i=0;i<700;i++){
@@ -99,16 +120,81 @@ int main(){
     car = imread("auto.png",1);
     const Mat car_ref = car; 
 //***********************************************************************
-    Point pt = Point(200,500); //init point
-    Point circle_pt = Point(200,500); //point for clearing position
-    Point pt2 = Point(200,490); //init point for clearing rectangle
-    Point trajectory_pt = Point(200,500+car.rows/2);
+    
+    Point circle_pt = Point(200,400); //point for clearing position (punkt narożnika wyświetlającego obraz auta)
+    Point pt2 = Point(200,420); //init point for clearing rectangle (przeciwległy narożnik)
+    Point trajectory_pt = Point(200,400+car.rows/2);
     Point ref_pt = Point(200-2,500+car.rows/2);
     int thickness =-1,lineType=8, shift=0;
     float distance = car.rows/2;
     int x_trans,y_trans;
 
+    float diff;
+    static float prev_x=0,prev_y=0;
+    static float pos_x,pos_y;
+    while(read_file.peek()!=EOF){
+    //*************************get data**************************
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
+        getline(read_file,read_temp,',');
 
+        getline(read_file,read_x,',');
+        getline(read_file,read_y,',');
+        getline(read_file,read_roll,'\n');
+        //std::cout<<"x: "<<read_x<<std::endl;
+        //std::cout<<"y: "<<read_y<<std::endl;
+//*************************************************************
+        //calculate cleating posiotions
+        circle_pt.x = pt.x-x_trans;
+        circle_pt.y = pt.y-y_trans;
+        pt2.x = circle_pt.x+car.cols;
+        pt2.y = circle_pt.y+car.rows;
+        //rectangle(image, circle_pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
+        rectangle(image, pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
+        count++;
+        
+        if(count==1){ //init
+            pt.x = 500 + std::stof(read_x)*10;
+            pt.y = 400 + std::stof(read_y)*10;
+            pos_x = pt.x;
+            pos_y = pt.y;
+        }else{
+            diff = std::stof(read_x)*10 - prev_x;
+            pos_x += diff;
+            pt.x = pos_x;
+            diff = std::stof(read_y)*10 - prev_y;
+
+            pos_y += diff;
+            pt.y = pos_y;
+            prev_x = std::stof(read_x)*10;
+            prev_y = std::stof(read_y)*10;  
+        }
+        
+        image = translate_window(image, pt, car, pos_x,pos_y);
+        pt.x = pos_x;
+        pt.y = pos_y;
+
+        temp_orient = std::stof(read_roll)* M_PI / 180; //radians
+        trajectory_pt.x = distance*sin(temp_orient) + pt.x;
+        trajectory_pt.y = distance*cos(temp_orient) + pt.y;
+        circle(image, trajectory_pt, 32, Scalar(0,102,204), FILLED, LINE_8); // print trajectory
+
+        car = rotate(car_ref,std::stof(read_roll), &x_trans, &y_trans);
+        car.copyTo(image(Rect(pt.x-x_trans,pt.y-y_trans,car.cols,car.rows)));
+        //car.copyTo(image(Rect(pt.x,pt.y,car.cols,car.rows)));
+        imshow("Start project with opencv", image);
+        waitKey(2);
+    }
+    std::cout<<"counter "<<count<<std::endl;
     for(int i=0;i<700;i++){
 //************************************Clear PREVIOUS POSITIONS************************************
         circle_pt.x = pt.x-x_trans;
@@ -117,10 +203,8 @@ int main(){
         pt2.y = circle_pt.y+car.rows;
         rectangle(image, circle_pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
 //**********************window translation**************************************
-       image = translate_window(image, pt, car);
+       //image = translate_window(image, pt, car);
 //*************************************************************************************************
-
-
 //************************************calculate new positions*************************************
         orient = orient + v_rot[i];
         temp_orient = orient * M_PI / 180; //radians
