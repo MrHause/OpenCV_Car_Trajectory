@@ -7,10 +7,30 @@
 #include<fstream>
 using namespace cv;
 
-int v_lin[700],v_rot[700],orient=0;
-double temp_orient;
 
-Point pt = Point(200,500); //init point
+
+Point pt = Point(200,500); //main point
+Mat image(1000,1000, CV_8UC3, Scalar(255,255,255)); //full window
+Mat dst(1000,1000, CV_8UC3, Scalar(255,255,255)); //temp window to perfor functions
+Point circle_pt = Point(200,400); //point for clearing position (punkt narożnika wyświetlającego obraz auta)
+Point pt2 = Point(200,420); //init point for clearing rectangle (przeciwległy narożnik)
+Point trajectory_pt = Point(200,400);
+
+static Mat car;
+Mat trajectory;
+Mat car_ref; 
+
+int thickness =-1,lineType=8, shift=0;
+float distance;
+int x_trans,y_trans;
+
+void sim_init(){
+    car = imread("auto.png",1);
+    car_ref = car;
+    trajectory_pt.x = 200;
+    trajectory_pt.y = 400+car.rows/2;
+    distance = car.rows/2;
+}
 
 //rotate object of the car based on rot angle of the car
 Mat rotate(Mat src, double angle, int *x_pos, int *y_pos)
@@ -83,24 +103,67 @@ Mat translate_window(Mat image, Point &pt, Mat car, float &pos_x, float &pos_y){
         return image;
 }
 
-int show_position(float pos_x, float pos_y, float roll){
-    pt.x = pos_x;
-    pt.y = pos_y;
+int show_position(float read_x, float read_y, float read_roll){
+        double temp_orient;
+        float diff;
+        static float prev_x,prev_y;
+        static float pos_x,pos_y;
+        static int count;
+        count++;
+        //calculate cleating posiotions
+        circle_pt.x = pt.x-x_trans;
+        circle_pt.y = pt.y-y_trans;
+        pt2.x = circle_pt.x+car.cols;
+        pt2.y = circle_pt.y+car.rows;
+        rectangle(image, circle_pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
+        //rectangle(image, pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position      
+        if(count==1){ //init
+            pt.x = 500 + read_x*10;
+            pt.y = 400 + read_y*10;
+            pos_x = pt.x;
+            pos_y = pt.y;
+        }else{
+            diff = read_x*10 - prev_x;
+            pos_x += diff;
+            pt.x = pos_x;
+            diff = read_y*10 - prev_y;
 
-    return -1;
-}
+            pos_y += diff;
+            pt.y = pos_y;
+            prev_x = read_x*10;
+            prev_y = read_y*10;  
+        }
+        
+        image = translate_window(image, pt, car, pos_x,pos_y);
+        pt.x = pos_x;
+        pt.y = pos_y;
+
+        temp_orient = read_roll* M_PI / 180; //radians
+        trajectory_pt.x = distance*sin(temp_orient) + pt.x;
+        trajectory_pt.y = distance*cos(temp_orient) + pt.y;
+        circle(image, trajectory_pt, 32, Scalar(0,102,204), FILLED, LINE_8); // print trajectory
+
+        car = rotate(car_ref,read_roll, &x_trans, &y_trans);
+        car.copyTo(image(Rect(pt.x-x_trans,pt.y-y_trans,car.cols,car.rows)));
+        //car.copyTo(image(Rect(pt.x,pt.y,car.cols,car.rows)));
+        imshow("Start project with opencv", image);
+        waitKey(1);
+
+        return -1;
+    }
+    
+
 
 int main(){
-    Mat image(1000,1000, CV_8UC3, Scalar(255,255,255));
-    Mat dst(1000,1000, CV_8UC3, Scalar(255,255,255));
+    sim_init();
 
 //*****************************read data******************
     std::ifstream read_file("randomFullModelData.csv");
     if(!read_file.is_open()) std::cout<<"erro file";
     std::string read_x,read_y,read_roll,read_temp;
-    int count=0;
 
 //*************************generate speeds****************************    
+/*
     for(int i=0;i<700;i++){
         v_lin[i]=5;
     }
@@ -113,25 +176,14 @@ int main(){
         for(int i=400;i<700;i++){
         v_rot[i] = -1;
     }
+    */
 //**********************Load CAR IMAGE************************************
-    static Mat car;
-    //const Mat car_ref;
-    Mat trajectory;
-    car = imread("auto.png",1);
-    const Mat car_ref = car; 
-//***********************************************************************
-    
-    Point circle_pt = Point(200,400); //point for clearing position (punkt narożnika wyświetlającego obraz auta)
-    Point pt2 = Point(200,420); //init point for clearing rectangle (przeciwległy narożnik)
-    Point trajectory_pt = Point(200,400+car.rows/2);
-    Point ref_pt = Point(200-2,500+car.rows/2);
-    int thickness =-1,lineType=8, shift=0;
-    float distance = car.rows/2;
-    int x_trans,y_trans;
 
-    float diff;
-    static float prev_x=0,prev_y=0;
-    static float pos_x,pos_y;
+//***********************************************************************
+
+
+
+
     while(read_file.peek()!=EOF){
     //*************************get data**************************
         getline(read_file,read_temp,',');
@@ -150,51 +202,14 @@ int main(){
         getline(read_file,read_x,',');
         getline(read_file,read_y,',');
         getline(read_file,read_roll,'\n');
+
+        show_position(std::stof(read_x),std::stof(read_y),std::stof(read_roll));
+    }
         //std::cout<<"x: "<<read_x<<std::endl;
         //std::cout<<"y: "<<read_y<<std::endl;
 //*************************************************************
-        //calculate cleating posiotions
-        circle_pt.x = pt.x-x_trans;
-        circle_pt.y = pt.y-y_trans;
-        pt2.x = circle_pt.x+car.cols;
-        pt2.y = circle_pt.y+car.rows;
-        //rectangle(image, circle_pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
-        rectangle(image, pt, pt2, Scalar(255,255,255),thickness,lineType,shift); //clear previous position
-        count++;
-        
-        if(count==1){ //init
-            pt.x = 500 + std::stof(read_x)*10;
-            pt.y = 400 + std::stof(read_y)*10;
-            pos_x = pt.x;
-            pos_y = pt.y;
-        }else{
-            diff = std::stof(read_x)*10 - prev_x;
-            pos_x += diff;
-            pt.x = pos_x;
-            diff = std::stof(read_y)*10 - prev_y;
 
-            pos_y += diff;
-            pt.y = pos_y;
-            prev_x = std::stof(read_x)*10;
-            prev_y = std::stof(read_y)*10;  
-        }
-        
-        image = translate_window(image, pt, car, pos_x,pos_y);
-        pt.x = pos_x;
-        pt.y = pos_y;
-
-        temp_orient = std::stof(read_roll)* M_PI / 180; //radians
-        trajectory_pt.x = distance*sin(temp_orient) + pt.x;
-        trajectory_pt.y = distance*cos(temp_orient) + pt.y;
-        circle(image, trajectory_pt, 32, Scalar(0,102,204), FILLED, LINE_8); // print trajectory
-
-        car = rotate(car_ref,std::stof(read_roll), &x_trans, &y_trans);
-        car.copyTo(image(Rect(pt.x-x_trans,pt.y-y_trans,car.cols,car.rows)));
-        //car.copyTo(image(Rect(pt.x,pt.y,car.cols,car.rows)));
-        imshow("Start project with opencv", image);
-        waitKey(2);
-    }
-    std::cout<<"counter "<<count<<std::endl;
+/*
     for(int i=0;i<700;i++){
 //************************************Clear PREVIOUS POSITIONS************************************
         circle_pt.x = pt.x-x_trans;
@@ -224,6 +239,7 @@ int main(){
         imshow("Start project with opencv", image);
         waitKey(10); //delay 10ms
     } //end simulation
+    */
     waitKey(0);
     return 0;
 }
